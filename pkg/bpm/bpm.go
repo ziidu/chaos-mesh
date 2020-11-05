@@ -210,6 +210,7 @@ func DefaultProcessBuilder(cmd string, args ...string) *ProcessBuilder {
 		nsOptions:  []nsOption{},
 		pause:      false,
 		suicide:    false,
+		sudo:       true,
 		identifier: nil,
 		ctx:        context.Background(),
 	}
@@ -224,6 +225,8 @@ type ProcessBuilder struct {
 
 	pause   bool
 	suicide bool
+
+	sudo bool
 
 	identifier *string
 
@@ -267,6 +270,13 @@ func (b *ProcessBuilder) EnablePause() *ProcessBuilder {
 // EnableSuicide enables suicide for process
 func (b *ProcessBuilder) EnableSuicide() *ProcessBuilder {
 	b.suicide = true
+
+	return b
+}
+
+// DisableSudo enables sudo for process
+func (b *ProcessBuilder) DisableSudo() *ProcessBuilder {
+	b.sudo = false
 
 	return b
 }

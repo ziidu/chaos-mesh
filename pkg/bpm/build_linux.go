@@ -58,6 +58,11 @@ func (b *ProcessBuilder) Build() *ManagedProcess {
 		cmd = pausePath
 	}
 
+	if b.sudo {
+		args = append([]string{cmd}, args...)
+		cmd = "sudo"
+	}
+
 	if c := mock.On("MockProcessBuild"); c != nil {
 		f := c.(func(context.Context, string, ...string) *exec.Cmd)
 		return &ManagedProcess{
