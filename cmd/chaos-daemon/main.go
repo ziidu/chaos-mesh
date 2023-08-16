@@ -47,6 +47,11 @@ func init() {
 	flag.StringVar(&conf.CrClientConfig.Runtime, "runtime", "docker", "current container runtime")
 	flag.StringVar(&conf.CrClientConfig.SocketPath, "runtime-socket-path", "", "current container runtime socket path")
 	flag.StringVar(&conf.CrClientConfig.ContainerdNS, "containerd-ns", "k8s.io", "namespace used for containerd")
+
+	flag.StringVar(&conf.CrClientConfig.SocketPathes, "socket-pathes", "", "all container runtime socket pathes")
+	flag.StringVar(&conf.CrClientConfig.SaturnApiURL, "saturn-api-url", "", "saturn api request address")
+	flag.StringVar(&conf.CrClientConfig.Authorization, "authorization", "", "saturn api request basic auth")
+
 	flag.StringVar(&conf.CaCert, "ca", "", "ca certificate of grpc server")
 	flag.StringVar(&conf.Cert, "cert", "", "certificate of grpc server")
 	flag.StringVar(&conf.Key, "key", "", "key of grpc server")

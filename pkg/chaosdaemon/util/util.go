@@ -16,11 +16,14 @@
 package util
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -28,6 +31,81 @@ import (
 	"github.com/chaos-mesh/chaos-mesh/pkg/bpm"
 	"github.com/chaos-mesh/chaos-mesh/pkg/chaosdaemon/graph"
 )
+
+var (
+	defaultHttpClient = http.Client{
+		Transport: &http.Transport{},
+		Timeout:   5 * time.Second,
+	}
+)
+
+const (
+	RuntimeKey  = "runtime"
+	HOST_IP_ENV = "PA_HOST_IP"
+)
+
+type SaturnApiResult struct {
+	Metric map[string]interface{}
+	Value  []interface{}
+}
+
+type SaturnApiData struct {
+	ResultType string
+	Result     []SaturnApiResult
+}
+type SaturnApiResp struct {
+	Status string
+	Data   SaturnApiData
+}
+
+func ParseRuntime(saturnApi string, auth string) (runtime string, err error) {
+	var (
+		request *http.Request
+		resp    *http.Response
+	)
+
+	hostIp := os.Getenv(HOST_IP_ENV)
+	if len(hostIp) == 0 {
+		return runtime, fmt.Errorf("not found hostIP from env")
+	}
+
+	queryURL := saturnApi + fmt.Sprintf("/api/v1/query?query=pingan_k8s_os_check_runtime_service{host_ip='%s'}", hostIp)
+
+	if request, err = http.NewRequest(http.MethodGet, queryURL, nil); err != nil {
+		return
+	}
+	request.Header.Set("Authorization", auth)
+
+	if resp, err = defaultHttpClient.Do(request); err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("response status code is invalid: %d", resp.StatusCode)
+		return
+	}
+
+	var saturnApiResp SaturnApiResp
+	if err = json.NewDecoder(resp.Body).Decode(&saturnApiResp); err != nil {
+		return
+	}
+	if len(saturnApiResp.Data.Result) < 1 {
+		err = fmt.Errorf("not found result from saturn api by nodeIP %s", "")
+		return
+	}
+
+	if runtimeInterface, ok := saturnApiResp.Data.Result[0].Metric[RuntimeKey]; !ok {
+		err = fmt.Errorf("not found runtime in Metric result")
+		return
+	} else {
+		if runtime, ok = runtimeInterface.(string); !ok {
+			err = fmt.Errorf("runtime type is invalid")
+			return
+		}
+	}
+	return
+}
 
 // ReadCommName returns the command name of process
 func ReadCommName(pid int) (string, error) {

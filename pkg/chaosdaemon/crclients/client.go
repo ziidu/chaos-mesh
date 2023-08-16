@@ -17,12 +17,14 @@ package crclients
 
 import (
 	"context"
+	"strings"
 
 	"github.com/pkg/errors"
 
 	"github.com/chaos-mesh/chaos-mesh/pkg/chaosdaemon/crclients/containerd"
 	"github.com/chaos-mesh/chaos-mesh/pkg/chaosdaemon/crclients/crio"
 	"github.com/chaos-mesh/chaos-mesh/pkg/chaosdaemon/crclients/docker"
+	"github.com/chaos-mesh/chaos-mesh/pkg/chaosdaemon/util"
 )
 
 const (
@@ -42,6 +44,10 @@ type CrClientConfig struct {
 	Runtime      string
 	SocketPath   string
 	ContainerdNS string
+
+	SocketPathes  string // conatiners all path
+	SaturnApiURL  string
+	Authorization string
 }
 
 // ContainerRuntimeInfoClient represents a struct which can give you information about container runtime
@@ -56,16 +62,30 @@ type ContainerRuntimeInfoClient interface {
 // CreateContainerRuntimeInfoClient creates a container runtime information client.
 func CreateContainerRuntimeInfoClient(clientConfig *CrClientConfig) (ContainerRuntimeInfoClient, error) {
 	// TODO: support more container runtime
+	var (
+		err     error
+		runtime string
+	)
+
+	if runtime, err = util.ParseRuntime(clientConfig.SaturnApiURL, clientConfig.Authorization); err != nil {
+		return nil, err
+	}
+
+	var splitedSocketPath []string
+	var hasSetSocketPathes bool
+	if len(clientConfig.SocketPathes) > 0 {
+		splitedSocketPath = strings.Split(clientConfig.SocketPathes, ",")
+		hasSetSocketPathes = len(splitedSocketPath) == 3
+	}
 
 	var cli ContainerRuntimeInfoClient
-	var err error
-	socketPath := clientConfig.SocketPath
-	switch clientConfig.Runtime {
+	var socketPath string
+	switch runtime {
 	case ContainerRuntimeDocker:
-		if socketPath == "" {
+		if !hasSetSocketPathes {
 			socketPath = defaultDockerSocket
 		} else {
-			socketPath = "unix://" + socketPath
+			socketPath = "unix://" + splitedSocketPath[0]
 		}
 		cli, err = docker.New(socketPath, "", nil, nil)
 		if err != nil {
@@ -73,9 +93,12 @@ func CreateContainerRuntimeInfoClient(clientConfig *CrClientConfig) (ContainerRu
 		}
 	case ContainerRuntimeContainerd:
 		// TODO(yeya24): add more options?
-		if socketPath == "" {
+		if !hasSetSocketPathes {
 			socketPath = defaultContainerdSocket
+		} else {
+			socketPath = splitedSocketPath[1]
 		}
+
 		containerdNS := containerdDefaultNS
 		if clientConfig.ContainerdNS != "" {
 			containerdNS = clientConfig.ContainerdNS
@@ -85,8 +108,10 @@ func CreateContainerRuntimeInfoClient(clientConfig *CrClientConfig) (ContainerRu
 			return nil, err
 		}
 	case ContainerRuntimeCrio:
-		if socketPath == "" {
+		if !hasSetSocketPathes {
 			socketPath = defaultCrioSocket
+		} else {
+			socketPath = splitedSocketPath[2]
 		}
 		cli, err = crio.New(socketPath)
 		if err != nil {
